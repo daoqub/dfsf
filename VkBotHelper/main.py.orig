@@ -1,0 +1,105 @@
+import logging
+import os
+import sys
+import io
+import asyncio
+
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram import Update
+from dotenv import load_dotenv
+
+from handlers import (
+    handle_media_group,
+    handle_photo_video,
+    handle_document,
+    handle_audio,
+    handle_text,
+    handle_edited_message
+)
+from config import init_supabase, init_vk, init_telegram
+
+# Загружаем переменные окружения
+load_dotenv()
+
+# Настраиваем логирование
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("bot.log", encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Отключаем лишние логи
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+
+# Создаем директорию для файлов
+os.makedirs('./files', exist_ok=True)
+
+def main():
+    """Основная функция запуска бота"""
+    try:
+        # Инициализируем соединения с базой данных и API
+        init_supabase()
+        init_vk()
+        init_telegram()
+        
+        # Инициализируем бота
+        token = os.getenv('TELEGRAM_API_TOKEN') or os.getenv('TELEGRAM_BOT_TOKEN')
+        if not token:
+            raise ValueError("Не указан токен Telegram API")
+            
+        updater = Updater(token=token, use_context=True)
+        dispatcher = updater.dispatcher
+        
+        # Регистрируем обработчики
+        # В версии 13.15 нет Filters.media_group, поэтому используем группировку в самих обработчиках
+        
+        # Обработчик медиагрупп и одиночных сообщений
+        dispatcher.add_handler(MessageHandler(
+            Filters.chat_type.channel & (Filters.photo | Filters.video | Filters.audio | Filters.document | Filters.text),
+            handle_media_group
+        ))
+        
+        # Обработчики для одиночных медиа-сообщений
+        dispatcher.add_handler(MessageHandler(
+            Filters.chat_type.channel & (Filters.photo | Filters.video),
+            handle_photo_video
+        ))
+        
+        dispatcher.add_handler(MessageHandler(
+            Filters.chat_type.channel & Filters.document,
+            handle_document
+        ))
+        
+        dispatcher.add_handler(MessageHandler(
+            Filters.chat_type.channel & Filters.audio,
+            handle_audio
+        ))
+        
+        dispatcher.add_handler(MessageHandler(
+            Filters.chat_type.channel & Filters.text,
+            handle_text
+        ))
+        
+        dispatcher.add_handler(MessageHandler(
+            Filters.chat_type.channel & Filters.update.edited_channel_post,
+            handle_edited_message
+        ))
+        
+        logging.info("Бот Tg2Vk запущен и ожидает сообщения в каналах")
+        # Запускаем бота
+        updater.start_polling()
+        updater.idle()
+        
+    except Exception as e:
+        logging.error(f"Критическая ошибка: {e}")
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+
+{% block title %}Настройки кросспостинга - Tg2Vk Bot{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Настройки кросспостинга</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSettingModal">
+            <i data-feather="plus"></i> Добавить настройку
+        </button>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if settings %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Telegram канал</th>
+                            <th>Группа VK</th>
+                            <th>Публикация от</th>
+                            <th>Статус</th>
+                            <th>Дата создания</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for setting in settings %}
+                        <tr>
+                            <td>{{ setting.id }}</td>
+                            <td>
+                                {% set channel = channels|selectattr('id', 'eq', setting.telegram_channel_id)|first %}
+                                {% if channel %}
+                                    {% if channel.channel_username %}
+                                    <a href="https://t.me/{{ channel.channel_username }}" target="_blank">
+                                        @{{ channel.channel_username }}
+                                    </a>
+                                    {% else %}
+                                    {{ channel.channel_title or 'Канал #' + channel.id|string }}
+                                    {% endif %}
+                                {% else %}
+                                    Канал #{{ setting.telegram_channel_id }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set vk_target = vk_targets|selectattr('id', 'eq', setting.vk_target_id)|first %}
+                                {% if vk_target %}
+                                    <a href="https://vk.com/public{{ vk_target.target_id|abs }}" target="_blank">
+                                        {{ vk_target.target_name or 'Группа #' + vk_target.target_id|string }}
+                                    </a>
+                                {% else %}
+                                    Группа #{{ setting.vk_target_id }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if setting.post_as_group == 1 %}
+                                <span class="badge bg-primary">Группы</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Личного аккаунта</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if setting.is_active %}
+                                <span class="badge bg-success">Активна</span>
+                                {% else %}
+                                <span class="badge bg-danger">Неактивна</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ setting.created_at }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-info" onclick="viewSetting('{{ setting.id }}')">
+                                        <i data-feather="eye"></i>
+                                    </button>
+                                    <button class="btn btn-outline-success" onclick="toggleSetting('{{ setting.id }}', {{ 'false' if setting.is_active else 'true' }})">
+                                        <i data-feather="{{ 'pause' if setting.is_active else 'play' }}"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="deleteSetting('{{ setting.id }}')">
+                                        <i data-feather="trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i data-feather="settings" style="width: 48px; height: 48px;"></i>
+                <h4 class="mt-3">Нет настроек кросспостинга</h4>
+                <p class="text-muted">Добавьте вашу первую настройку для начала работы бота</p>
+                <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addSettingModal">
+                    Добавить настройку
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления настройки -->
+<div class="modal fade" id="addSettingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новую настройку кросспостинга</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addSettingForm">
+                    <div class="mb-3">
+                        <label for="telegram_channel_id" class="form-label">Telegram канал *</label>
+                        <select class="form-select" id="telegram_channel_id" required>
+                            <option value="">Выберите канал...</option>
+                            {% for channel in channels %}
+                            <option value="{{ channel.id }}">
+                                {{ channel.channel_username or channel.channel_title or 'Канал #' + channel.id|string }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if not channels %}
+                        <small class="form-text text-danger">
+                            Нет доступных каналов. <a href="{{ url_for('channels') }}">Добавьте канал</a> сначала.
+                        </small>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label for="vk_target_id" class="form-label">Группа VK *</label>
+                        <select class="form-select" id="vk_target_id" required>
+                            <option value="">Выберите группу VK...</option>
+                            {% for target in vk_targets %}
+                            <option value="{{ target.id }}">
+                                {{ target.target_name or 'Группа #' + target.target_id|string }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if not vk_targets %}
+                        <small class="form-text text-danger">
+                            Нет доступных групп. <a href="{{ url_for('vk_targets') }}">Добавьте группу VK</a> сначала.
+                        </small>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Публиковать от имени:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="post_as_group" id="post_as_group_1" value="1" checked>
+                            <label class="form-check-label" for="post_as_group_1">
+                                От имени группы
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="post_as_group" id="post_as_group_0" value="0">
+                            <label class="form-check-label" for="post_as_group_0">
+                                От имени личного аккаунта
+                            </label>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i data-feather="info" class="me-2"></i>
+                        Бот должен быть добавлен администратором в Telegram канал, и токен VK должен иметь права на публикацию в группе.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveSettingBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно просмотра настройки -->
+<div class="modal fade" id="viewSettingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Информация о настройке кросспостинга</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="settingDetails">
+                <!-- Данные о настройке будут загружены через JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const saveSettingBtn = document.getElementById('saveSettingBtn');
+        
+        saveSettingBtn.addEventListener('click', function() {
+            // Получаем данные формы
+            const telegram_channel_id = document.getElementById('telegram_channel_id').value;
+            const vk_target_id = document.getElementById('vk_target_id').value;
+            const post_as_group = document.querySelector('input[name="post_as_group"]:checked').value;
+            
+            // Проверяем заполнение обязательных полей
+            if (!telegram_channel_id) {
+                alert('Пожалуйста, выберите Telegram канал');
+                return;
+            }
+            
+            if (!vk_target_id) {
+                alert('Пожалуйста, выберите группу VK');
+                return;
+            }
+            
+            // Отправляем запрос на сервер
+            fetch('/crosspost_settings/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    telegram_channel_id: telegram_channel_id,
+                    vk_target_id: vk_target_id,
+                    post_as_group: post_as_group
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Закрываем модальное окно и перезагружаем страницу
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addSettingModal'));
+                    modal.hide();
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                alert('Произошла ошибка при сохранении настройки');
+            });
+        });
+    });
+    
+    function viewSetting(settingId) {
+        // Находим настройку в списке и отображаем информацию о ней
+        const settings = {{ settings|tojson }};
+        const channels = {{ channels|tojson }};
+        const vk_targets = {{ vk_targets|tojson }};
+        
+        const setting = settings.find(s => s.id == settingId);
+        
+        if (!setting) {
+            alert('Настройка не найдена');
+            return;
+        }
+        
+        // Находим данные о канале и группе
+        const channel = channels.find(c => c.id == setting.telegram_channel_id);
+        const vk_target = vk_targets.find(t => t.id == setting.vk_target_id);
+        
+        let channelName = channel ? 
+            (channel.channel_username ? '@' + channel.channel_username : channel.channel_title || 'Канал #' + channel.id) :
+            'Канал #' + setting.telegram_channel_id;
+            
+        let vkTargetName = vk_target ?
+            (vk_target.target_name || 'Группа #' + vk_target.target_id) :
+            'Группа #' + setting.vk_target_id;
+            
+        let settingStatus = setting.is_active ? 
+            '<span class="badge bg-success">Активна</span>' : 
+            '<span class="badge bg-danger">Неактивна</span>';
+            
+        let postAsGroupText = setting.post_as_group == 1 ?
+            'От имени группы' :
+            'От имени личного аккаунта';
+        
+        const details = `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Настройка кросспостинга #${setting.id}</h5>
+                    <p class="card-text">Статус: ${settingStatus}</p>
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Telegram канал:</span>
+                        <span>${channelName}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Группа VK:</span>
+                        <span>${vkTargetName}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Публикация:</span>
+                        <span>${postAsGroupText}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Дата создания:</span>
+                        <span>${setting.created_at}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Последнее изменение:</span>
+                        <span>${setting.updated_at || 'Не изменялась'}</span>
+                    </li>
+                </ul>
+            </div>
+        `;
+        
+        document.getElementById('settingDetails').innerHTML = details;
+        const modal = new bootstrap.Modal(document.getElementById('viewSettingModal'));
+        modal.show();
+    }
+    
+    function toggleSetting(settingId, makeActive) {
+        alert('Функция ' + (makeActive ? 'активации' : 'деактивации') + ' настройки еще не реализована');
+        // Здесь будет реализована функция включения/выключения настройки
+    }
+    
+    function deleteSetting(settingId) {
+        if (confirm('Вы уверены, что хотите удалить эту настройку? Это действие нельзя отменить.')) {
+            // Здесь будет реализована функция удаления настройки
+            alert('Функция удаления настройки еще не реализована');
+        }
+    }
+</script>
+{% endblock %}

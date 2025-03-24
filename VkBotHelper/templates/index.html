@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Tg2Vk Bot - Главная{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Панель управления Tg2Vk</h1>
+        <span class="badge bg-primary">Beta</span>
+    </div>
+    
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i data-feather="message-circle" class="me-2"></i>
+                        Telegram каналы
+                    </h5>
+                    <p class="card-text display-4">{{ channels_count }}</p>
+                    <a href="{{ url_for('channels') }}" class="btn btn-sm btn-primary">Управление каналами</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i data-feather="users" class="me-2"></i>
+                        Группы VK
+                    </h5>
+                    <p class="card-text display-4">{{ vk_targets_count }}</p>
+                    <a href="{{ url_for('vk_targets') }}" class="btn btn-sm btn-primary">Управление группами</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i data-feather="settings" class="me-2"></i>
+                        Настройки кросспостинга
+                    </h5>
+                    <p class="card-text display-4">{{ settings_count }}</p>
+                    <a href="{{ url_for('crosspost_settings') }}" class="btn btn-sm btn-primary">Управление настройками</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Последние посты</h5>
+                    <a href="{{ url_for('logs') }}" class="btn btn-sm btn-outline-info">Все посты</a>
+                </div>
+                <div class="card-body">
+                    {% if posts %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Канал</th>
+                                    <th>Группа</th>
+                                    <th>Статус</th>
+                                    <th>Дата</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for post in posts %}
+                                <tr>
+                                    <td>{{ post.id }}</td>
+                                    <td>{{ post.channel_username or post.telegram_channel_id }}</td>
+                                    <td>{{ post.target_name or post.vk_target_id }}</td>
+                                    <td>
+                                        {% if post.status == 'published' %}
+                                        <span class="badge bg-success">Опубликован</span>
+                                        {% elif post.status == 'error' %}
+                                        <span class="badge bg-danger">Ошибка</span>
+                                        {% elif post.status == 'edited' %}
+                                        <span class="badge bg-info">Изменен</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ post.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ post.created_at }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-center">Нет данных о постах</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Последние логи</h5>
+                    <a href="{{ url_for('logs') }}" class="btn btn-sm btn-outline-info">Все логи</a>
+                </div>
+                <div class="card-body">
+                    {% if logs %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Уровень</th>
+                                    <th>Сообщение</th>
+                                    <th>Дата</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td>
+                                        {% if log.level == 'info' %}
+                                        <span class="badge bg-info">INFO</span>
+                                        {% elif log.level == 'error' %}
+                                        <span class="badge bg-danger">ERROR</span>
+                                        {% elif log.level == 'warning' %}
+                                        <span class="badge bg-warning">WARNING</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ log.level }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log.message }}</td>
+                                    <td>{{ log.created_at }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-center">Нет логов</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

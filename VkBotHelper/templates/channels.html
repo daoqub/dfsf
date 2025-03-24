@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+
+{% block title %}Telegram каналы - Tg2Vk Bot{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Управление Telegram каналами</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addChannelModal">
+            <i data-feather="plus"></i> Добавить канал
+        </button>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if channels %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Название</th>
+                            <th>Username</th>
+                            <th>ID канала</th>
+                            <th>Статус</th>
+                            <th>Дата добавления</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for channel in channels %}
+                        <tr>
+                            <td>{{ channel.id }}</td>
+                            <td>{{ channel.channel_title or 'Без названия' }}</td>
+                            <td>
+                                {% if channel.channel_username %}
+                                <a href="https://t.me/{{ channel.channel_username }}" target="_blank">
+                                    @{{ channel.channel_username }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">Приватный канал</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ channel.channel_id }}</td>
+                            <td>
+                                {% if channel.is_verified %}
+                                <span class="badge bg-success">Подтвержден</span>
+                                {% else %}
+                                <span class="badge bg-warning">Ожидает подтверждения</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ channel.created_at }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-info" onclick="viewChannel('{{ channel.id }}')">
+                                        <i data-feather="eye"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="deleteChannel('{{ channel.id }}')">
+                                        <i data-feather="trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i data-feather="message-circle" style="width: 48px; height: 48px;"></i>
+                <h4 class="mt-3">Нет добавленных каналов</h4>
+                <p class="text-muted">Добавьте ваш первый Telegram канал для начала работы</p>
+                <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addChannelModal">
+                    Добавить канал
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления канала -->
+<div class="modal fade" id="addChannelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новый канал</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addChannelForm">
+                    <div class="mb-3">
+                        <label for="channel_id" class="form-label">ID канала *</label>
+                        <input type="text" class="form-control" id="channel_id" required>
+                        <small class="form-text text-muted">
+                            Например: -1001234567890 (ID можно получить через @username_to_id_bot)
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="channel_title" class="form-label">Название канала</label>
+                        <input type="text" class="form-control" id="channel_title">
+                    </div>
+                    <div class="mb-3">
+                        <label for="channel_username" class="form-label">Username канала</label>
+                        <div class="input-group">
+                            <span class="input-group-text">@</span>
+                            <input type="text" class="form-control" id="channel_username">
+                        </div>
+                        <small class="form-text text-muted">
+                            Без символа @ в начале. Например: mychannel
+                        </small>
+                    </div>
+                    <div class="alert alert-info">
+                        <i data-feather="info" class="me-2"></i>
+                        Для работы бота нужно добавить его администратором канала.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveChannelBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно просмотра канала -->
+<div class="modal fade" id="viewChannelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Информация о канале</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="channelDetails">
+                <!-- Данные о канале будут загружены через JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const saveChannelBtn = document.getElementById('saveChannelBtn');
+        
+        saveChannelBtn.addEventListener('click', function() {
+            // Получаем данные формы
+            const channel_id = document.getElementById('channel_id').value;
+            const channel_title = document.getElementById('channel_title').value;
+            const channel_username = document.getElementById('channel_username').value;
+            
+            // Проверяем заполнение обязательных полей
+            if (!channel_id) {
+                alert('Пожалуйста, укажите ID канала');
+                return;
+            }
+            
+            // Отправляем запрос на сервер
+            fetch('/channels/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    channel_id: channel_id,
+                    channel_title: channel_title,
+                    channel_username: channel_username
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Закрываем модальное окно и перезагружаем страницу
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addChannelModal'));
+                    modal.hide();
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                alert('Произошла ошибка при сохранении канала');
+            });
+        });
+    });
+    
+    function viewChannel(channelId) {
+        // Находим канал в списке и отображаем информацию о нем
+        const channels = {{ channels|tojson }};
+        const channel = channels.find(c => c.id == channelId);
+        
+        if (!channel) {
+            alert('Канал не найден');
+            return;
+        }
+        
+        let channelLink = channel.channel_username ? 
+            `<a href="https://t.me/${channel.channel_username}" target="_blank">@${channel.channel_username}</a>` : 
+            'Приватный канал';
+            
+        let channelStatus = channel.is_verified ? 
+            '<span class="badge bg-success">Подтвержден</span>' : 
+            '<span class="badge bg-warning">Ожидает подтверждения</span>';
+            
+        const details = `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">${channel.channel_title || 'Без названия'}</h5>
+                    <p class="card-text">${channelLink}</p>
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>ID канала:</span>
+                        <span>${channel.channel_id}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Статус:</span>
+                        <span>${channelStatus}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Дата добавления:</span>
+                        <span>${channel.created_at}</span>
+                    </li>
+                </ul>
+            </div>
+        `;
+        
+        document.getElementById('channelDetails').innerHTML = details;
+        const modal = new bootstrap.Modal(document.getElementById('viewChannelModal'));
+        modal.show();
+    }
+    
+    function deleteChannel(channelId) {
+        if (confirm('Вы уверены, что хотите удалить этот канал? Это действие нельзя отменить.')) {
+            // В реальном приложении здесь будет запрос на удаление канала
+            alert('Функция удаления канала еще не реализована');
+        }
+    }
+</script>
+{% endblock %}
